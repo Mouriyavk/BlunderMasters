@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard – Blunder Masters</title>
+    <meta name="description" content="Admin dashboard for creating and managing chess tournaments." />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♛</text></svg>" />
+</head>
+
+<body>
+
+    <!-- ── Navigation ── -->
+    <nav>
+        <div class="nav-inner">
+            <a href="index.html" class="nav-brand">
+                <span class="chess-icon">♛</span>
+                <span>Blunder Masters</span>
+            </a>
+            <div class="nav-links">
+                <a href="scoreboard.html">Scoreboard</a>
+                <span id="navAdminEmail" class="admin-indicator"></span>
+                <a href="index.html" class="btn btn-secondary btn-sm">← Home</a>
+                <button id="navLogout">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ── Auth Guard Overlay ── -->
+    <div id="authGuard" style="
+        position:fixed;inset:0;z-index:300;
+        background:var(--bg-primary);
+        display:flex;align-items:center;justify-content:center;
+        flex-direction:column;gap:16px;">
+        <div class="spinner"></div>
+        <p style="color:var(--text-muted)">Checking authentication…</p>
+    </div>
+
+    <!-- ── Dashboard Content ── -->
+    <div id="dashboardContent" class="hidden">
+
+        <!-- Page Header -->
+        <div style="padding:32px 24px 0;max-width:1100px;margin:0 auto;position:relative;z-index:1;">
+            <div class="section-title" style="font-family:'Playfair Display',serif;font-size:2rem;">Admin Dashboard
+            </div>
+            <div class="section-subtitle">Create and manage chess tournaments</div>
+        </div>
+
+        <!-- Dashboard Layout -->
+        <div class="dashboard-layout">
+
+            <!-- ── LEFT: Create Tournament Form ── -->
+            <div>
+                <div class="card card-gold">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="icon">♟</div>
+                            New Tournament
+                        </div>
+                    </div>
+
+                    <div id="createAlert"></div>
+
+                    <!-- ── SECTION: Basic Info ── -->
+                    <div class="form-section-label">Basic Info</div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="tournamentName">Tournament Name</label>
+                        <input id="tournamentName" type="text" class="form-input"
+                            placeholder="e.g. Spring Championship 2025" maxlength="80" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="tournamentFormat">Tournament Format</label>
+                        <select id="tournamentFormat" class="form-select" onchange="onFormatChange()">
+                            <option value="league">🏆 League (Round Robin)</option>
+                            <option value="knockout">⚔️ Knockout (Elimination)</option>
+                        </select>
+                        <div class="form-hint" id="formatHint">Every player plays every other player once, grouped into
+                            rounds.</div>
+                    </div>
+
+                    <!-- ── SECTION: Chess Settings ── -->
+                    <div class="form-section-label" style="margin-top:24px;">Chess Settings</div>
+
+                    <!-- Time Control -->
+                    <div class="form-group">
+                        <label class="form-label" for="timeControl">Time Control</label>
+                        <select id="timeControl" class="form-select" onchange="onTimeControlChange()">
+                            <option value="bullet">⚡ Bullet (1–2 min)</option>
+                            <option value="blitz">🔥 Blitz (3–5 min)</option>
+                            <option value="rapid" selected>⏱ Rapid (10–25 min)</option>
+                            <option value="classical">♟ Classical (30+ min)</option>
+                            <option value="custom">✏️ Custom</option>
+                        </select>
+                        <div class="form-hint" id="timeControlHint">Each player gets 10–25 minutes per game.</div>
+                    </div>
+
+                    <!-- Custom Time (shown only when "Custom" is selected) -->
+                    <div class="form-group" id="customTimeGroup" style="display:none;">
+                        <label class="form-label" for="customTime">Custom Time (per player)</label>
+                        <input id="customTime" type="text" class="form-input"
+                            placeholder="e.g. 15+10 (15 min + 10 sec increment)" maxlength="40" />
+                        <div class="form-hint">Format: minutes+increment (e.g. 15+10) or just minutes (e.g. 45)</div>
+                    </div>
+
+                    <!-- Chess Variant -->
+                    <div class="form-group">
+                        <label class="form-label" for="chessVariant">Chess Variant</label>
+                        <select id="chessVariant" class="form-select">
+                            <option value="standard">♟ Standard</option>
+                            <option value="chess960">🔀 Chess960 (Fischer Random)</option>
+                            <option value="crazyhouse">🏠 Crazyhouse</option>
+                            <option value="kingofthehill">⛰ King of the Hill</option>
+                            <option value="threecheck">3️⃣ Three-Check</option>
+                            <option value="antichess">🔄 Antichess (Losing Chess)</option>
+                            <option value="atomic">💥 Atomic</option>
+                            <option value="horde">🐴 Horde</option>
+                            <option value="racingkings">🏁 Racing Kings</option>
+                        </select>
+                    </div>
+
+                    <!-- Additional Notes -->
+                    <div class="form-group">
+                        <label class="form-label" for="tournamentNotes">Additional Notes <span
+                                style="font-weight:400;text-transform:none;color:var(--text-muted)">(optional)</span></label>
+                        <input id="tournamentNotes" type="text" class="form-input"
+                            placeholder="e.g. FIDE rated, prizes, venue info…" maxlength="120" />
+                    </div>
+
+                    <!-- ── SECTION: Players ── -->
+                    <div class="form-section-label" style="margin-top:24px;">Players</div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="numPlayers">Number of Players</label>
+                        <input id="numPlayers" type="number" class="form-input" placeholder="e.g. 8" min="2" max="32"
+                            oninput="generatePlayerFields()" />
+                        <div class="form-hint">Min 2, max 32 players</div>
+                    </div>
+
+                    <div class="form-group" id="playerFieldsGroup" style="display:none;">
+                        <label class="form-label">Player Names</label>
+                        <div id="playerFields"></div>
+                    </div>
+
+                    <!-- Submit -->
+                    <button id="createBtn" class="btn btn-primary btn-full mt-16" onclick="createTournament()">
+                        ♛ Create Tournament
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── RIGHT: Recent Tournaments ── -->
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="icon">🏆</div>
+                            Your Tournaments
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="loadMyTournaments()">↻ Refresh</button>
+                    </div>
+                    <div id="myTournamentsList">
+                        <div class="loading-wrap">
+                            <div class="spinner"></div>
+                            <p>Loading…</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /dashboard-layout -->
+    </div><!-- /dashboardContent -->
+
+    <!-- ── Confirm Delete Modal ── -->
+    <div id="deleteModal" style="
+        display:none;position:fixed;inset:0;z-index:400;
+        background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);
+        align-items:center;justify-content:center;padding:20px;" onclick="closeDeleteModal(event)">
+        <div class="auth-card" style="width:100%;max-width:400px;text-align:center;" onclick="event.stopPropagation()">
+            <div style="font-size:2.5rem;margin-bottom:12px;">🗑️</div>
+            <h2 style="font-size:1.4rem;margin-bottom:8px;">Delete Tournament?</h2>
+            <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:24px;">
+                "<span id="deleteTournamentName" style="color:var(--text-primary);font-weight:600;"></span>"
+                <br />This action cannot be undone.
+            </p>
+            <div style="display:flex;gap:12px;">
+                <button class="btn btn-secondary btn-full" onclick="closeDeleteModal()">Cancel</button>
+                <button class="btn btn-danger btn-full" id="confirmDeleteBtn" onclick="confirmDelete()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Toast ── -->
+    <div id="toast"></div>
+
+    <!-- ── Scripts ── -->
+    <script type="module">
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import {
+            collection, addDoc, getDocs, deleteDoc,
+            doc, orderBy, query, serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+        let currentUser = null;
+        let pendingDeleteId = null;   // ID of tournament pending deletion
+
+        // ── Auth Guard ──────────────────────────────────────────────
+        onAuthStateChanged(auth, (user) => {
+            const guard = document.getElementById('authGuard');
+            const content = document.getElementById('dashboardContent');
+            if (user) {
+                currentUser = user;
+                guard.style.display = 'none';
+                content.classList.remove('hidden');
+                document.getElementById('navAdminEmail').textContent = '♟ ' + user.email.split('@')[0];
+                loadMyTournaments();
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+
+        // ── Logout ──────────────────────────────────────────────────
+        document.getElementById('navLogout').addEventListener('click', async () => {
+            await signOut(auth);
+            window.location.href = 'index.html';
+        });
+
+        // ── Time Control Hints ───────────────────────────────────────
+        const timeHints = {
+            bullet: 'Each player gets 1–2 minutes per game.',
+            blitz: 'Each player gets 3–5 minutes per game.',
+            rapid: 'Each player gets 10–25 minutes per game.',
+            classical: 'Each player gets 30+ minutes per game.',
+            custom: 'Enter your own time control below.'
+        };
+
+        window.onTimeControlChange = function () {
+            const val = document.getElementById('timeControl').value;
+            document.getElementById('timeControlHint').textContent = timeHints[val] || '';
+            document.getElementById('customTimeGroup').style.display = val === 'custom' ? 'block' : 'none';
+        };
+
+        // ── Format Change Hint ───────────────────────────────────────
+        window.onFormatChange = function () {
+            const fmt = document.getElementById('tournamentFormat').value;
+            document.getElementById('formatHint').textContent = fmt === 'league'
+                ? 'Every player plays every other player once, grouped into rounds.'
+                : 'Players are eliminated after one loss. New rounds generate automatically.';
+        };
+
+        // ── Generate Player Name Fields ──────────────────────────────
+        window.generatePlayerFields = function () {
+            const n = parseInt(document.getElementById('numPlayers').value);
+            const group = document.getElementById('playerFieldsGroup');
+            const fields = document.getElementById('playerFields');
+
+            if (!n || n < 2 || n > 32) { group.style.display = 'none'; fields.innerHTML = ''; return; }
+
+            group.style.display = 'block';
+            fields.innerHTML = '';
+            for (let i = 1; i <= n; i++) {
+                const wrap = document.createElement('div');
+                wrap.className = 'player-field-wrap';
+                wrap.innerHTML = `
+                    <span class="player-num">${i}</span>
+                    <input type="text" class="form-input" id="player_${i}"
+                        placeholder="Player ${i} name" maxlength="40" />`;
+                fields.appendChild(wrap);
+            }
+        };
+
+        // ── Create Tournament ────────────────────────────────────────
+        window.createTournament = async function () {
+            const alertEl = document.getElementById('createAlert');
+            const btn = document.getElementById('createBtn');
+            alertEl.innerHTML = '';
+
+            const name = document.getElementById('tournamentName').value.trim();
+            const format = document.getElementById('tournamentFormat').value;
+            const n = parseInt(document.getElementById('numPlayers').value);
+            const tcVal = document.getElementById('timeControl').value;
+            const variant = document.getElementById('chessVariant').value;
+            const notes = document.getElementById('tournamentNotes').value.trim();
+
+            // Resolve time control label
+            const tcLabels = {
+                bullet: 'Bullet (1–2 min)', blitz: 'Blitz (3–5 min)',
+                rapid: 'Rapid (10–25 min)', classical: 'Classical (30+ min)'
+            };
+            let timeControl = tcVal === 'custom'
+                ? (document.getElementById('customTime').value.trim() || 'Custom')
+                : tcLabels[tcVal];
+
+            if (!name) {
+                alertEl.innerHTML = '<div class="alert alert-error">⚠️ Please enter a tournament name.</div>';
+                return;
+            }
+            if (!n || n < 2 || n > 32) {
+                alertEl.innerHTML = '<div class="alert alert-error">⚠️ Number of players must be between 2 and 32.</div>';
+                return;
+            }
+
+            const players = [];
+            for (let i = 1; i <= n; i++) {
+                const val = document.getElementById(`player_${i}`)?.value.trim();
+                if (!val) {
+                    alertEl.innerHTML = `<div class="alert alert-error">⚠️ Please enter a name for Player ${i}.</div>`;
+                    return;
+                }
+                players.push(val);
+            }
+
+            const unique = new Set(players.map(p => p.toLowerCase()));
+            if (unique.size !== players.length) {
+                alertEl.innerHTML = '<div class="alert alert-error">⚠️ All player names must be unique.</div>';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Creating…';
+
+            try {
+                let matches = [];
+                let standings = [];
+
+                if (format === 'knockout') {
+                    matches = generateKnockoutRound1(players);
+                } else {
+                    matches = generateLeagueRounds(players);
+                    standings = initStandings(players);
+                }
+
+                const docRef = await addDoc(collection(db, 'tournaments'), {
+                    name, format, players, matches, standings,
+                    timeControl, variant, notes,
+                    status: 'active',       // 'active' | 'finished'
+                    winner: null,
+                    createdAt: serverTimestamp(),
+                    createdBy: currentUser.uid
+                });
+
+                showToast('✓ Tournament created!', 'success');
+                setTimeout(() => { window.location.href = `tournament.html?id=${docRef.id}`; }, 600);
+
+            } catch (err) {
+                alertEl.innerHTML = `<div class="alert alert-error">⚠️ Error: ${err.message}</div>`;
+                btn.disabled = false;
+                btn.textContent = '♛ Create Tournament';
+            }
+        };
+
+        // ── Knockout: Generate Round 1 ───────────────────────────────
+        function generateKnockoutRound1(players) {
+            const shuffled = [...players].sort(() => Math.random() - 0.5);
+            return buildKnockoutRound(shuffled, 1);
+        }
+
+        function buildKnockoutRound(players, roundNum) {
+            const list = [...players];
+            const matches = [];
+            if (list.length % 2 !== 0) list.push('BYE');
+            for (let i = 0; i < list.length; i += 2) {
+                const isBye = list[i + 1] === 'BYE';
+                matches.push({
+                    id: `r${roundNum}_m${Math.floor(i / 2) + 1}`,
+                    round: roundNum,
+                    player1: list[i], player2: list[i + 1],
+                    winner: isBye ? list[i] : null,
+                    result: isBye ? 'bye' : null
+                });
+            }
+            return matches;
+        }
+
+        // ── League: Circle Method ────────────────────────────────────
+        function generateLeagueRounds(players) {
+            const list = [...players];
+            if (list.length % 2 !== 0) list.push('BYE');
+            const n = list.length;
+            const numRounds = n - 1;
+            const matches = [];
+            let matchNum = 1;
+
+            for (let round = 1; round <= numRounds; round++) {
+                for (let i = 0; i < n / 2; i++) {
+                    const p1 = list[i], p2 = list[n - 1 - i];
+                    if (p1 === 'BYE' || p2 === 'BYE') continue;
+                    matches.push({ id: `r${round}_m${matchNum++}`, round, player1: p1, player2: p2, result: null });
+                }
+                const last = list.pop();
+                list.splice(1, 0, last);
+            }
+            return matches;
+        }
+
+        function initStandings(players) {
+            return players.map(name => ({ name, played: 0, wins: 0, draws: 0, losses: 0, points: 0 }));
+        }
+
+        // ── Load Tournaments List ────────────────────────────────────
+        window.loadMyTournaments = async function () {
+            const listEl = document.getElementById('myTournamentsList');
+            listEl.innerHTML = '<div class="loading-wrap"><div class="spinner"></div><p>Loading…</p></div>';
+
+            try {
+                const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
+                const snap = await getDocs(q);
+
+                if (snap.empty) {
+                    listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">♟</div><p>No tournaments yet.<br/>Create your first one!</p></div>`;
+                    return;
+                }
+
+                listEl.innerHTML = '';
+                snap.forEach(docSnap => {
+                    const t = docSnap.data();
+                    const id = docSnap.id;
+                    const date = t.createdAt?.toDate
+                        ? t.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                        : '';
+
+                    const completed = t.matches?.filter(m => m.result || m.winner).length || 0;
+                    const total = t.matches?.length || 0;
+                    const isFinished = t.status === 'finished';
+
+                    // Build info chips
+                    const chips = [];
+                    if (t.timeControl) chips.push(`⏱ ${t.timeControl}`);
+                    if (t.variant && t.variant !== 'standard') chips.push(`🎲 ${variantLabel(t.variant)}`);
+
+                    const item = document.createElement('div');
+                    item.style.cssText = 'padding:14px 0;border-bottom:1px solid var(--border);';
+                    item.innerHTML = `
+                        <div class="flex-between" style="align-items:flex-start;gap:12px;">
+                            <div style="min-width:0;flex:1;">
+                                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                    <span style="font-weight:600;font-size:0.95rem;">${t.name}</span>
+                                    ${isFinished
+                            ? `<span style="font-size:0.7rem;background:rgba(34,197,94,0.15);color:var(--success);padding:2px 8px;border-radius:100px;border:1px solid rgba(34,197,94,0.3);">✓ Finished</span>`
+                            : `<span style="font-size:0.7rem;background:rgba(212,175,55,0.1);color:var(--gold);padding:2px 8px;border-radius:100px;border:1px solid rgba(212,175,55,0.25);">● Active</span>`}
+                                </div>
+                                <div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px;">
+                                    ${t.format === 'knockout' ? '⚔️ Knockout' : '🏆 League'} · ${t.players?.length} players · ${date}
+                                </div>
+                                ${chips.length ? `<div style="font-size:0.75rem;color:var(--text-secondary);margin-top:3px;">${chips.join(' &nbsp;·&nbsp; ')}</div>` : ''}
+                                <div style="font-size:0.78rem;color:var(--gold);margin-top:3px;">${completed}/${total} matches played</div>
+                                ${isFinished && t.winner ? `<div style="font-size:0.8rem;color:var(--gold);margin-top:4px;">🏆 Winner: <strong>${t.winner}</strong></div>` : ''}
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+                                <a href="tournament.html?id=${id}" class="btn btn-secondary btn-sm">View →</a>
+                                <button class="btn btn-danger btn-sm" onclick="openDeleteModal('${id}', '${escapeAttr(t.name)}')">🗑 Delete</button>
+                            </div>
+                        </div>`;
+                    listEl.appendChild(item);
+                });
+            } catch (err) {
+                listEl.innerHTML = `<div class="alert alert-error">⚠️ ${err.message}</div>`;
+            }
+        };
+
+        // ── Delete Modal ─────────────────────────────────────────────
+        window.openDeleteModal = function (id, name) {
+            pendingDeleteId = id;
+            document.getElementById('deleteTournamentName').textContent = name;
+            document.getElementById('deleteModal').style.display = 'flex';
+        };
+
+        window.closeDeleteModal = function (e) {
+            if (!e || e.target === document.getElementById('deleteModal')) {
+                document.getElementById('deleteModal').style.display = 'none';
+                pendingDeleteId = null;
+            }
+        };
+
+        window.confirmDelete = async function () {
+            if (!pendingDeleteId) return;
+            const btn = document.getElementById('confirmDeleteBtn');
+            btn.disabled = true;
+            btn.textContent = 'Deleting…';
+            try {
+                await deleteDoc(doc(db, 'tournaments', pendingDeleteId));
+                document.getElementById('deleteModal').style.display = 'none';
+                pendingDeleteId = null;
+                showToast('Tournament deleted.', 'info');
+                loadMyTournaments();
+            } catch (err) {
+                showToast('⚠️ Error: ' + err.message, 'error');
+                btn.disabled = false;
+                btn.textContent = 'Delete';
+            }
+        };
+
+        // ── Helpers ──────────────────────────────────────────────────
+        function variantLabel(v) {
+            const map = {
+                chess960: 'Chess960', crazyhouse: 'Crazyhouse',
+                kingofthehill: 'King of the Hill', threecheck: 'Three-Check',
+                antichess: 'Antichess', atomic: 'Atomic',
+                horde: 'Horde', racingkings: 'Racing Kings'
+            };
+            return map[v] || v;
+        }
+
+        function escapeAttr(str) {
+            return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
+        window.showToast = function (msg, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = `show toast-${type}`;
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => toast.className = '', 3000);
+        };
+    </script>
+</body>
+
+</html>

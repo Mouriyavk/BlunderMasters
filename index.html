@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blunder Masters Scoreboard – Home</title>
+    <meta name="description"
+        content="Blunder Masters: The ultimate chess tournament scoreboard. Track brackets, league standings, and live results for your chess championships." />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♛</text></svg>" />
+</head>
+
+<body>
+
+    <!-- ── Navigation ── -->
+    <nav>
+        <div class="nav-inner">
+            <a href="index.html" class="nav-brand">
+                <span class="chess-icon">♛</span>
+                <span>Blunder Masters</span>
+            </a>
+            <div class="nav-links">
+                <a href="scoreboard.html">Scoreboard</a>
+                <span id="navAdminName" class="admin-indicator hidden">
+                    ♟ Admin
+                </span>
+                <a href="dashboard.html" id="navDashboard" class="hidden btn-nav-primary">Dashboard</a>
+                <button id="navLogout" class="hidden">Logout</button>
+                <button id="navLoginBtn" onclick="showLoginModal()">Admin Login</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ── Hero ── -->
+    <section class="hero">
+        <div class="hero-badge">♟ Live Tournament Tracking</div>
+        <h1>Blunder Masters<br />Scoreboard</h1>
+        <p>Manage knockout brackets and league standings in real-time. Create tournaments, track results, and watch
+            leaderboards update live.</p>
+        <div class="hero-actions">
+            <a href="dashboard.html" id="heroCreateBtn" class="btn btn-primary">
+                ♛ Create Tournament
+            </a>
+            <button onclick="scrollToTournaments()" class="btn btn-secondary">
+                View Tournaments ↓
+            </button>
+        </div>
+    </section>
+
+    <!-- ── Tournaments List ── -->
+    <div id="tournamentsSection" style="position:relative;z-index:1;">
+        <div class="container">
+            <div class="section-header">
+                <div>
+                    <div class="section-title">Active Tournaments</div>
+                    <div class="section-subtitle">Click any tournament to view the bracket and leaderboard</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tournamentsList" class="tournaments-grid">
+            <!-- Loading state -->
+            <div class="loading-wrap" style="grid-column:1/-1">
+                <div class="spinner"></div>
+                <p>Loading tournaments…</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Admin Login Modal ── -->
+    <div id="loginModal" style="
+  display:none;
+  position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,0.7);
+  backdrop-filter:blur(8px);
+  align-items:center;justify-content:center;
+  padding:20px;
+" onclick="closeLoginModal(event)">
+        <div class="auth-card" style="width:100%;max-width:420px;" onclick="event.stopPropagation()">
+            <div style="text-align:center;margin-bottom:8px;font-size:2rem;">♛</div>
+            <h2>Admin Access</h2>
+            <p class="auth-subtitle">Sign in to manage tournaments and enter results</p>
+
+            <div id="loginAlert"></div>
+            <div class="form-group">
+                <label class="form-label" for="loginEmail">Email</label>
+                <input id="loginEmail" type="email" class="form-input" placeholder="admin@example.com" />
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="loginPassword">Password</label>
+                <input id="loginPassword" type="password" class="form-input" placeholder="••••••••" />
+            </div>
+            <button id="loginBtn" class="btn btn-primary btn-full" onclick="handleLogin()">
+                Sign In
+            </button>
+        </div>
+    </div>
+
+    <!-- ── Toast ── -->
+    <div id="toast"></div>
+
+    <!-- ── Scripts ── -->
+    <script type="module">
+        import { auth, db } from './firebase-config.js';
+        import {
+            onAuthStateChanged,
+            signInWithEmailAndPassword,
+            signOut
+        } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import {
+            collection,
+            getDocs,
+            orderBy,
+            query
+        } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+        // ── Auth State ──────────────────────────────────────────────
+        onAuthStateChanged(auth, (user) => {
+            const navDashboard = document.getElementById('navDashboard');
+            const navLogout = document.getElementById('navLogout');
+            const navLoginBtn = document.getElementById('navLoginBtn');
+            const navAdminName = document.getElementById('navAdminName');
+            const heroCreateBtn = document.getElementById('heroCreateBtn');
+
+            if (user) {
+                // Admin is logged in
+                navDashboard.classList.remove('hidden');
+                navLogout.classList.remove('hidden');
+                navAdminName.classList.remove('hidden');
+                navLoginBtn.classList.add('hidden');
+                navAdminName.textContent = '♟ ' + (user.email.split('@')[0]);
+            } else {
+                // Not logged in
+                navDashboard.classList.add('hidden');
+                navLogout.classList.add('hidden');
+                navAdminName.classList.add('hidden');
+                navLoginBtn.classList.remove('hidden');
+                heroCreateBtn.href = '#';
+                heroCreateBtn.onclick = (e) => { e.preventDefault(); showLoginModal(); };
+            }
+        });
+
+        // ── Load Tournaments ────────────────────────────────────────
+        async function loadTournaments() {
+            const listEl = document.getElementById('tournamentsList');
+            try {
+                const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
+                const snap = await getDocs(q);
+
+                if (snap.empty) {
+                    listEl.innerHTML = `
+          <div class="empty-state" style="grid-column:1/-1">
+            <div class="empty-icon">♟</div>
+            <p>No tournaments yet. Create the first one!</p>
+          </div>`;
+                    return;
+                }
+
+                listEl.innerHTML = '';
+                snap.forEach(doc => {
+                    const t = doc.data();
+                    const date = t.createdAt?.toDate
+                        ? t.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                        : 'Recently';
+
+                    // Count completed matches
+                    const total = t.matches?.length || 0;
+                    const completed = t.matches?.filter(m => m.result || m.winner).length || 0;
+
+                    const card = document.createElement('a');
+                    card.href = `tournament.html?id=${doc.id}`;
+                    card.className = 'tournament-card';
+                    card.innerHTML = `
+          <div class="flex-between mb-8">
+            <span class="format-badge ${t.format}">${t.format === 'knockout' ? '⚔️ Knockout' : '🏆 League'}</span>
+            <span style="font-size:0.75rem;color:var(--text-muted)">${date}</span>
+          </div>
+          <div class="tournament-card-name">${t.name}</div>
+          <div style="font-size:0.85rem;color:var(--text-secondary);margin-top:6px">
+            ${t.players?.length || 0} players
+          </div>
+          <div class="tournament-card-meta">
+            <span style="color:${completed === total && total > 0 ? 'var(--success)' : 'var(--gold)'}">
+              ${completed === total && total > 0 ? '✓ Completed' : `${completed}/${total} matches played`}
+            </span>
+          </div>`;
+                    listEl.appendChild(card);
+                });
+            } catch (err) {
+                listEl.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+        <p>⚠️ Error loading tournaments: ${err.message}</p>
+      </div>`;
+            }
+        }
+
+        loadTournaments();
+
+        // ── Login ───────────────────────────────────────────────────
+        window.handleLogin = async function () {
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const alertEl = document.getElementById('loginAlert');
+            const btn = document.getElementById('loginBtn');
+
+            if (!email || !password) {
+                alertEl.innerHTML = '<div class="alert alert-error">⚠️ Please enter email and password.</div>';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Signing in…';
+            alertEl.innerHTML = '';
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                showToast('✓ Logged in successfully!', 'success');
+                closeLoginModal();
+                setTimeout(() => window.location.href = 'dashboard.html', 800);
+            } catch (err) {
+                alertEl.innerHTML = `<div class="alert alert-error">⚠️ ${friendlyAuthError(err.code)}</div>`;
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        };
+
+
+        // ── Logout ──────────────────────────────────────────────────
+        document.getElementById('navLogout').addEventListener('click', async () => {
+            await signOut(auth);
+            showToast('Logged out.', 'info');
+        });
+
+        // ── Allow Enter key on login ─────────────────────────────────
+        document.getElementById('loginPassword').addEventListener('keydown', e => {
+            if (e.key === 'Enter') window.handleLogin();
+        });
+
+        // ── Helpers ─────────────────────────────────────────────────
+        function friendlyAuthError(code) {
+            const map = {
+                'auth/user-not-found': 'No account found with this email.',
+                'auth/wrong-password': 'Incorrect password.',
+                'auth/invalid-email': 'Invalid email address.',
+                'auth/email-already-in-use': 'This email is already registered.',
+                'auth/weak-password': 'Password is too weak (min 6 chars).',
+                'auth/too-many-requests': 'Too many attempts. Try again later.',
+                'auth/invalid-credential': 'Invalid email or password.',
+            };
+            return map[code] || 'Authentication failed. Please try again.';
+        }
+
+        // ── Global helpers (called from HTML onclick) ────────────────
+        window.showLoginModal = function () {
+            const modal = document.getElementById('loginModal');
+            modal.style.display = 'flex';
+            document.getElementById('loginEmail').focus();
+        };
+
+        window.closeLoginModal = function (e) {
+            if (!e || e.target === document.getElementById('loginModal')) {
+                document.getElementById('loginModal').style.display = 'none';
+            }
+        };
+
+
+        window.scrollToTournaments = function () {
+            document.getElementById('tournamentsSection').scrollIntoView({ behavior: 'smooth' });
+        };
+
+        window.showToast = function (msg, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = `show toast-${type}`;
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => toast.className = '', 3000);
+        };
+    </script>
+</body>
+
+</html>

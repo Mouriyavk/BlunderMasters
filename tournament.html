@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tournament View – Blunder Masters</title>
+    <meta name="description" content="Live chess tournament bracket and leaderboard." />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♛</text></svg>" />
+</head>
+
+<body>
+
+    <!-- ── Navigation ── -->
+    <nav>
+        <div class="nav-inner">
+            <a href="index.html" class="nav-brand">
+                <span class="chess-icon">♛</span>
+                <span>Blunder Masters</span>
+            </a>
+            <div class="nav-links">
+                <a href="scoreboard.html">Scoreboard</a>
+                <span id="navAdminBadge" class="admin-indicator hidden">♟ Admin</span>
+                <a href="index.html" class="btn btn-secondary btn-sm">← All Tournaments</a>
+                <a href="dashboard.html" id="navDashboard" class="hidden btn-nav-primary btn btn-sm">Dashboard</a>
+                <button id="navLogout" class="hidden">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ── Loading State ── -->
+    <div id="loadingState" class="loading-wrap" style="position:relative;z-index:1;padding-top:80px;">
+        <div class="spinner"></div>
+        <p>Loading tournament…</p>
+    </div>
+
+    <!-- ── Error State ── -->
+    <div id="errorState" class="hidden" style="position:relative;z-index:1;">
+        <div class="empty-state" style="padding-top:80px;">
+            <div class="empty-icon">⚠️</div>
+            <p id="errorMsg">Tournament not found.</p>
+            <a href="index.html" class="btn btn-secondary mt-16">← Back to Home</a>
+        </div>
+    </div>
+
+    <!-- ── Tournament Content ── -->
+    <div id="tournamentContent" class="hidden">
+
+        <!-- Tournament Header -->
+        <div class="tournament-header">
+            <div class="tournament-meta">
+                <span class="format-badge" id="formatBadge"></span>
+                <span id="statusBadge"
+                    style="display:none;font-size:0.78rem;font-weight:600;padding:3px 10px;border-radius:100px;"></span>
+                <span style="font-size:0.8rem;color:var(--text-muted)" id="tournamentDate"></span>
+            </div>
+            <div class="tournament-name" id="tournamentName"></div>
+
+            <!-- Info chips (time control, variant, notes) -->
+            <div id="tournamentInfoChips" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;"></div>
+
+            <!-- Stats Row -->
+            <div class="stats-row mt-24" id="statsRow"></div>
+        </div>
+
+        <!-- ── Admin Control Panel (visible to admin only) ── -->
+        <div id="adminPanel" class="hidden" style="position:relative;z-index:1;">
+            <div class="container" style="padding-bottom:0;">
+                <div style="
+                    background:rgba(212,175,55,0.06);
+                    border:1px solid rgba(212,175,55,0.2);
+                    border-radius:var(--radius-md);
+                    padding:16px 20px;
+                    display:flex;
+                    align-items:center;
+                    justify-content:space-between;
+                    flex-wrap:wrap;
+                    gap:12px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:1rem;">🔧</span>
+                        <span style="font-weight:600;font-size:0.9rem;color:var(--gold);">Admin Controls</span>
+                        <span id="adminPanelNote" style="font-size:0.78rem;color:var(--text-muted);">Select results in
+                            the matches panel below.</span>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                        <button id="finishBtn" class="btn btn-success btn-sm" onclick="openFinishModal()">
+                            🏆 Finish Tournament
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="openDeleteModal()">
+                            🗑 Delete Tournament
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Layout -->
+        <div class="tournament-layout">
+
+            <!-- ── LEFT: Matches ── -->
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="icon">⚔️</div>
+                            <span id="matchesTitle">Matches</span>
+                        </div>
+                        <span id="adminMatchNote" class="hidden" style="font-size:0.78rem;color:var(--gold);">
+                            ✏️ Admin: select results below
+                        </span>
+                    </div>
+                    <div id="matchesList"></div>
+                </div>
+            </div>
+
+            <!-- ── RIGHT: Leaderboard ── -->
+            <div>
+                <div class="card" style="position:sticky;top:80px;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="icon">🏆</div>
+                            Leaderboard
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table id="leaderboardTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Player</th>
+                                    <th>P</th>
+                                    <th>W</th>
+                                    <th>D</th>
+                                    <th>L</th>
+                                    <th>Pts</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboardBody"></tbody>
+                        </table>
+                    </div>
+                    <div id="leaderboardEmpty" class="empty-state hidden">
+                        <p>Results will appear here as matches are played.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /tournament-layout -->
+    </div><!-- /tournamentContent -->
+
+    <!-- ── Finish Tournament Modal ── -->
+    <div id="finishModal" style="
+        display:none;position:fixed;inset:0;z-index:400;
+        background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);
+        align-items:center;justify-content:center;padding:20px;" onclick="closeFinishModal(event)">
+        <div class="auth-card" style="width:100%;max-width:440px;" onclick="event.stopPropagation()">
+            <div style="text-align:center;font-size:2.5rem;margin-bottom:12px;">🏆</div>
+            <h2 style="text-align:center;margin-bottom:8px;">Finish Tournament</h2>
+            <p style="text-align:center;color:var(--text-secondary);font-size:0.9rem;margin-bottom:24px;">
+                Declare the official winner and close this tournament.
+            </p>
+            <div class="form-group">
+                <label class="form-label" for="winnerSelect">Select Winner</label>
+                <select id="winnerSelect" class="form-select">
+                    <option value="">Choose a player…</option>
+                </select>
+            </div>
+            <div id="finishAlert"></div>
+            <div style="display:flex;gap:12px;margin-top:8px;">
+                <button class="btn btn-secondary btn-full" onclick="closeFinishModal()">Cancel</button>
+                <button class="btn btn-success btn-full" id="confirmFinishBtn" onclick="confirmFinish()">
+                    🏆 Confirm Winner
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Delete Tournament Modal ── -->
+    <div id="deleteModal" style="
+        display:none;position:fixed;inset:0;z-index:400;
+        background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);
+        align-items:center;justify-content:center;padding:20px;" onclick="closeDeleteModal(event)">
+        <div class="auth-card" style="width:100%;max-width:400px;text-align:center;" onclick="event.stopPropagation()">
+            <div style="font-size:2.5rem;margin-bottom:12px;">🗑️</div>
+            <h2 style="font-size:1.4rem;margin-bottom:8px;">Delete Tournament?</h2>
+            <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:24px;">
+                This will permanently delete "<span id="deleteTournamentName"
+                    style="color:var(--text-primary);font-weight:600;"></span>".<br />
+                This action cannot be undone.
+            </p>
+            <div style="display:flex;gap:12px;">
+                <button class="btn btn-secondary btn-full" onclick="closeDeleteModal()">Cancel</button>
+                <button class="btn btn-danger btn-full" id="confirmDeleteBtn" onclick="confirmDelete()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Toast ── -->
+    <div id="toast"></div>
+
+    <!-- ── Scripts ── -->
+    <script type="module">
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import {
+            doc, getDoc, updateDoc, deleteDoc
+        } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+        // ── State ────────────────────────────────────────────────────
+        let tournament = null;
+        let tournamentId = null;
+        let isAdmin = false;
+        // Tracks which match IDs are currently in edit mode
+        const editingMatches = new Set();
+
+        const params = new URLSearchParams(window.location.search);
+        tournamentId = params.get('id');
+        if (!tournamentId) showError('No tournament ID in URL.');
+
+        // ── Auth State ──────────────────────────────────────────────
+        onAuthStateChanged(auth, (user) => {
+            isAdmin = !!user;
+            const navAdminBadge = document.getElementById('navAdminBadge');
+            const navDashboard = document.getElementById('navDashboard');
+            const navLogout = document.getElementById('navLogout');
+            const adminNote = document.getElementById('adminMatchNote');
+            const adminPanel = document.getElementById('adminPanel');
+
+            if (user) {
+                navAdminBadge.classList.remove('hidden');
+                navAdminBadge.textContent = '♟ ' + user.email.split('@')[0];
+                navDashboard.classList.remove('hidden');
+                navLogout.classList.remove('hidden');
+                adminNote.classList.remove('hidden');
+                adminPanel.classList.remove('hidden');
+            } else {
+                navAdminBadge.classList.add('hidden');
+                navDashboard.classList.add('hidden');
+                navLogout.classList.add('hidden');
+                adminNote.classList.add('hidden');
+                adminPanel.classList.add('hidden');
+            }
+
+            if (tournament) renderMatches();
+        });
+
+        document.getElementById('navLogout').addEventListener('click', async () => {
+            await signOut(auth);
+            showToast('Logged out.', 'info');
+        });
+
+        // ── Load Tournament ──────────────────────────────────────────
+        async function loadTournament() {
+            if (!tournamentId) return;
+            try {
+                const docSnap = await getDoc(doc(db, 'tournaments', tournamentId));
+                if (!docSnap.exists()) { showError('Tournament not found.'); return; }
+                tournament = docSnap.data();
+                renderTournament();
+            } catch (err) {
+                showError('Error loading tournament: ' + err.message);
+            }
+        }
+
+        loadTournament();
+
+        // ── Render Everything ────────────────────────────────────────
+        function renderTournament() {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('tournamentContent').classList.remove('hidden');
+
+            document.getElementById('tournamentName').textContent = tournament.name;
+
+            const formatBadge = document.getElementById('formatBadge');
+            formatBadge.textContent = tournament.format === 'knockout' ? '⚔️ Knockout' : '🏆 League';
+            formatBadge.className = `format-badge ${tournament.format}`;
+
+            // Status badge
+            const statusBadge = document.getElementById('statusBadge');
+            if (tournament.status === 'finished') {
+                statusBadge.style.display = 'inline-block';
+                statusBadge.style.background = 'rgba(34,197,94,0.15)';
+                statusBadge.style.color = 'var(--success)';
+                statusBadge.style.border = '1px solid rgba(34,197,94,0.3)';
+                statusBadge.textContent = '✓ Finished';
+                // Hide the Finish button if already finished
+                document.getElementById('finishBtn').style.display = 'none';
+            }
+
+            const date = tournament.createdAt?.toDate
+                ? tournament.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                : '';
+            document.getElementById('tournamentDate').textContent = date;
+
+            document.getElementById('matchesTitle').textContent =
+                tournament.format === 'knockout' ? 'Bracket Matches' : 'Round Robin Matches';
+
+            // Info chips
+            renderInfoChips();
+
+            // Populate winner select in finish modal
+            const sel = document.getElementById('winnerSelect');
+            sel.innerHTML = '<option value="">Choose a player…</option>';
+            (tournament.players || []).forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p; opt.textContent = p;
+                sel.appendChild(opt);
+            });
+            // Pre-select if already finished
+            if (tournament.winner) sel.value = tournament.winner;
+
+            // Set delete modal name
+            document.getElementById('deleteTournamentName').textContent = tournament.name;
+
+            renderStats();
+            renderMatches();
+            renderLeaderboard();
+        }
+
+        // ── Info Chips ───────────────────────────────────────────────
+        function renderInfoChips() {
+            const container = document.getElementById('tournamentInfoChips');
+            container.innerHTML = '';
+            const chips = [];
+
+            if (tournament.timeControl) chips.push({ icon: '⏱', label: tournament.timeControl });
+            if (tournament.variant && tournament.variant !== 'standard') {
+                chips.push({ icon: '🎲', label: variantLabel(tournament.variant) });
+            }
+            if (tournament.notes) chips.push({ icon: '📝', label: tournament.notes });
+            if (tournament.winner) chips.push({ icon: '🏆', label: `Winner: ${tournament.winner}` });
+
+            chips.forEach(c => {
+                const chip = document.createElement('span');
+                chip.style.cssText = `
+                    display:inline-flex;align-items:center;gap:5px;
+                    font-size:0.8rem;color:var(--text-secondary);
+                    background:rgba(255,255,255,0.05);
+                    border:1px solid var(--border);
+                    border-radius:100px;padding:4px 12px;`;
+                chip.textContent = `${c.icon} ${c.label}`;
+                container.appendChild(chip);
+            });
+        }
+
+        // ── Stats Row ────────────────────────────────────────────────
+        function renderStats() {
+            const allMatches = tournament.matches || [];
+            const realMatches = allMatches.filter(m => m.result !== 'bye');
+            const total = realMatches.length;
+            const completed = realMatches.filter(m => m.result || m.winner).length;
+            const players = tournament.players?.length || 0;
+
+            let extraStat = '';
+            if (tournament.format === 'knockout') {
+                const maxRound = Math.max(...allMatches.map(m => m.round || 1));
+                extraStat = `<div class="stat-card"><div class="stat-value">${maxRound}</div><div class="stat-label">Current Round</div></div>`;
+            }
+
+            document.getElementById('statsRow').innerHTML = `
+                <div class="stat-card"><div class="stat-value">${players}</div><div class="stat-label">Players</div></div>
+                <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Matches</div></div>
+                <div class="stat-card"><div class="stat-value">${completed}</div><div class="stat-label">Played</div></div>
+                <div class="stat-card"><div class="stat-value">${total - completed}</div><div class="stat-label">Remaining</div></div>
+                ${extraStat}`;
+        }
+
+        // ── Render Matches ───────────────────────────────────────────
+        function renderMatches() {
+            const container = document.getElementById('matchesList');
+            container.innerHTML = '';
+
+            if (!tournament.matches || tournament.matches.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>No matches scheduled.</p></div>';
+                return;
+            }
+
+            // If tournament is finished, lock all editing
+            const isFinished = tournament.status === 'finished';
+
+            if (tournament.format === 'knockout') {
+                renderKnockoutMatches(container, isFinished);
+            } else {
+                renderLeagueMatches(container, isFinished);
+            }
+        }
+
+        // ================================================================
+        //  KNOCKOUT RENDERING
+        // ================================================================
+        function renderKnockoutMatches(container, isFinished) {
+            const rounds = {};
+            tournament.matches.forEach(m => {
+                if (!rounds[m.round]) rounds[m.round] = [];
+                rounds[m.round].push(m);
+            });
+
+            const roundNums = Object.keys(rounds).map(Number).sort((a, b) => a - b);
+            const maxRound = Math.max(...roundNums);
+
+            // Active round = lowest incomplete round
+            let activeRound = maxRound;
+            for (const r of roundNums) {
+                if (rounds[r].some(m => !m.winner)) { activeRound = r; break; }
+            }
+
+            roundNums.forEach(roundNum => {
+                const roundMatches = rounds[roundNum];
+
+                const label = document.createElement('div');
+                label.className = 'match-round-label';
+                label.innerHTML = `
+                    <span>${getRoundName(roundNum, roundNums.length)}</span>
+                    ${!isFinished && roundNum === activeRound
+                        ? '<span style="color:var(--gold);margin-left:8px;font-size:0.7rem;">● ACTIVE</span>'
+                        : ''}`;
+                container.appendChild(label);
+
+                const grid = document.createElement('div');
+                grid.className = 'matches-grid';
+
+                roundMatches.forEach(match => {
+                    const isBye = match.player2 === 'BYE';
+                    const isComplete = !!match.winner;
+                    const isEditing = editingMatches.has(match.id);
+                    // Can enter result: active round, not complete, not bye
+                    const canEnter = isAdmin && !isFinished && roundNum === activeRound && !isComplete && !isBye;
+                    // Can edit: active round, complete, not bye, not already editing
+                    const canEditBtn = isAdmin && !isFinished && roundNum === activeRound && isComplete && !isBye && !isEditing;
+
+                    const card = document.createElement('div');
+                    card.className = `match-card ${isComplete && !isEditing ? 'completed' : ''} ${isBye ? 'bye' : ''}`;
+
+                    const p1Class = match.winner === match.player1 ? 'player-name winner' : 'player-name';
+                    const p2Class = match.winner === match.player2 ? 'player-name winner' : 'player-name';
+
+                    let resultHtml = '';
+                    if (isBye) {
+                        resultHtml = `<span class="result-badge bye">BYE – auto advance</span>`;
+                    } else if (isEditing) {
+                        // Inline edit mode: show dropdown pre-selected + cancel
+                        resultHtml = `
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <select id="ko_edit_${match.id}" style="font-size:0.85rem;">
+                                    <option value="">Select winner…</option>
+                                    <option value="${match.player1}" ${match.winner === match.player1 ? 'selected' : ''}>${match.player1}</option>
+                                    <option value="${match.player2}" ${match.winner === match.player2 ? 'selected' : ''}>${match.player2}</option>
+                                </select>
+                                <button class="btn btn-success btn-sm" onclick="editKnockoutWinner('${match.id}')" style="padding:6px 12px;">Save</button>
+                                <button class="btn btn-secondary btn-sm" onclick="cancelEdit('${match.id}')" style="padding:6px 10px;">✕</button>
+                            </div>`;
+                    } else if (isComplete) {
+                        resultHtml = `
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="result-badge win">✓ ${match.winner} wins</span>
+                                ${canEditBtn ? `<button class="btn-edit" onclick="toggleEditMatch('${match.id}')" title="Edit result">✏️ Edit</button>` : ''}
+                            </div>`;
+                    } else if (canEnter) {
+                        resultHtml = `
+                            <select id="ko_${match.id}" onchange="setKnockoutWinner('${match.id}', this.value)">
+                                <option value="">Select winner…</option>
+                                <option value="${match.player1}">${match.player1}</option>
+                                <option value="${match.player2}">${match.player2}</option>
+                            </select>`;
+                    } else {
+                        resultHtml = `<span style="font-size:0.8rem;color:var(--text-muted)">${roundNum < activeRound ? 'Done' : 'Pending'}</span>`;
+                    }
+
+                    card.innerHTML = `
+                        <div class="match-players">
+                            <span class="${p1Class}">${match.player1}</span>
+                            <span class="vs-divider">vs</span>
+                            <span class="${p2Class}">${match.player2}</span>
+                        </div>
+                        <div class="match-result">${resultHtml}</div>`;
+                    grid.appendChild(card);
+                });
+
+                container.appendChild(grid);
+            });
+
+            // Champion banner
+            const lastRound = rounds[maxRound];
+            if (lastRound.length === 1 && lastRound[0].winner) {
+                const champion = lastRound[0].winner;
+                const banner = document.createElement('div');
+                banner.className = 'champion-banner';
+                banner.innerHTML = `
+                    <div class="crown">♛</div>
+                    <div class="name">${champion}</div>
+                    <div class="label">Tournament Champion!</div>`;
+                container.appendChild(banner);
+            }
+        }
+
+        function getRoundName(roundNum, totalRounds) {
+            const fromEnd = totalRounds - roundNum;
+            if (fromEnd === 0) return 'Final';
+            if (fromEnd === 1) return 'Semi-Finals';
+            if (fromEnd === 2) return 'Quarter-Finals';
+            if (fromEnd === 3) return 'Round of 16';
+            return `Round ${roundNum}`;
+        }
+
+        // ================================================================
+        //  LEAGUE RENDERING
+        // ================================================================
+        function renderLeagueMatches(container, isFinished) {
+            const rounds = {};
+            tournament.matches.forEach(m => {
+                const r = m.round || 1;
+                if (!rounds[r]) rounds[r] = [];
+                rounds[r].push(m);
+            });
+
+            const roundNums = Object.keys(rounds).map(Number).sort((a, b) => a - b);
+
+            roundNums.forEach(roundNum => {
+                const roundMatches = rounds[roundNum];
+                const played = roundMatches.filter(m => m.result).length;
+                const total = roundMatches.length;
+                const allDone = played === total;
+
+                const label = document.createElement('div');
+                label.className = 'match-round-label';
+                label.innerHTML = `
+                    <span>Round ${roundNum}</span>
+                    <span style="margin-left:8px;font-size:0.7rem;color:${allDone ? 'var(--success)' : 'var(--text-muted)'}">
+                        ${allDone ? '✓ Complete' : `${played}/${total} played`}
+                    </span>`;
+                container.appendChild(label);
+
+                const grid = document.createElement('div');
+                grid.className = 'matches-grid';
+
+                roundMatches.forEach(match => {
+                    const isComplete = match.result !== null && match.result !== undefined;
+                    const isEditing = editingMatches.has(match.id);
+                    const canEnter = isAdmin && !isFinished && !isComplete;
+                    const canEditBtn = isAdmin && !isFinished && isComplete && !isEditing;
+
+                    const card = document.createElement('div');
+                    card.className = `match-card ${isComplete && !isEditing ? 'completed' : ''}`;
+
+                    let resultHtml = '';
+                    if (isEditing) {
+                        // Inline edit: show dropdown pre-selected to current result + save/cancel
+                        resultHtml = `
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <select id="lg_edit_${match.id}" style="font-size:0.85rem;">
+                                    <option value="">Result…</option>
+                                    <option value="player1" ${match.result === 'player1' ? 'selected' : ''}>${match.player1} wins</option>
+                                    <option value="draw" ${match.result === 'draw' ? 'selected' : ''}>Draw</option>
+                                    <option value="player2" ${match.result === 'player2' ? 'selected' : ''}>${match.player2} wins</option>
+                                </select>
+                                <button class="btn btn-success btn-sm" onclick="editLeagueResult('${match.id}')" style="padding:6px 12px;">Save</button>
+                                <button class="btn btn-secondary btn-sm" onclick="cancelEdit('${match.id}')" style="padding:6px 10px;">✕</button>
+                            </div>`;
+                    } else if (isComplete) {
+                        let badge = '';
+                        if (match.result === 'draw') badge = `<span class="result-badge draw">½–½ Draw</span>`;
+                        if (match.result === 'player1') badge = `<span class="result-badge win">1–0 ${match.player1}</span>`;
+                        if (match.result === 'player2') badge = `<span class="result-badge win">0–1 ${match.player2}</span>`;
+                        resultHtml = `
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                ${badge}
+                                ${canEditBtn ? `<button class="btn-edit" onclick="toggleEditMatch('${match.id}')" title="Edit result">✏️ Edit</button>` : ''}
+                            </div>`;
+                    } else if (canEnter) {
+                        resultHtml = `
+                            <select id="lg_${match.id}" onchange="setLeagueResult('${match.id}', this.value)">
+                                <option value="">Result…</option>
+                                <option value="player1">${match.player1} wins</option>
+                                <option value="draw">Draw</option>
+                                <option value="player2">${match.player2} wins</option>
+                            </select>`;
+                    } else {
+                        resultHtml = `<span style="font-size:0.8rem;color:var(--text-muted)">Pending</span>`;
+                    }
+
+                    const p1Style = match.result === 'player1' && !isEditing ? 'color:var(--gold);font-weight:700;' : '';
+                    const p2Style = match.result === 'player2' && !isEditing ? 'color:var(--gold);font-weight:700;' : '';
+
+                    card.innerHTML = `
+                        <div class="match-players">
+                            <span class="player-name" style="${p1Style}">${match.player1}</span>
+                            <span class="vs-divider">vs</span>
+                            <span class="player-name" style="${p2Style}">${match.player2}</span>
+                        </div>
+                        <div class="match-result">${resultHtml}</div>`;
+                    grid.appendChild(card);
+                });
+
+                container.appendChild(grid);
+            });
+        }
+
+        // ================================================================
+        //  EDIT HELPERS
+        // ================================================================
+
+        // Toggle a match into / out of edit mode and re-render
+        window.toggleEditMatch = function (matchId) {
+            if (editingMatches.has(matchId)) {
+                editingMatches.delete(matchId);
+            } else {
+                editingMatches.add(matchId);
+            }
+            renderMatches();
+        };
+
+        window.cancelEdit = function (matchId) {
+            editingMatches.delete(matchId);
+            renderMatches();
+        };
+
+        // ── Edit a LEAGUE result (replace existing result) ───────────
+        window.editLeagueResult = async function (matchId) {
+            const newResult = document.getElementById(`lg_edit_${matchId}`)?.value;
+            if (!newResult || !isAdmin) return;
+
+            try {
+                const matchIdx = tournament.matches.findIndex(m => m.id === matchId);
+                if (matchIdx === -1) return;
+
+                tournament.matches[matchIdx].result = newResult;
+                const standings = recalculateStandings(tournament.players, tournament.matches);
+                tournament.standings = standings;
+
+                await updateDoc(doc(db, 'tournaments', tournamentId), {
+                    matches: tournament.matches, standings
+                });
+
+                editingMatches.delete(matchId);
+                showToast('✓ Result updated!', 'success');
+                renderMatches(); renderStats(); renderLeaderboard();
+            } catch (err) {
+                showToast('⚠️ Error: ' + err.message, 'error');
+            }
+        };
+
+        // ── Edit a KNOCKOUT winner (rolls back subsequent rounds) ────
+        window.editKnockoutWinner = async function (matchId) {
+            const newWinner = document.getElementById(`ko_edit_${matchId}`)?.value;
+            if (!newWinner || !isAdmin) return;
+
+            try {
+                const matchIdx = tournament.matches.findIndex(m => m.id === matchId);
+                if (matchIdx === -1) return;
+
+                const currentRound = tournament.matches[matchIdx].round;
+                const oldWinner = tournament.matches[matchIdx].winner;
+
+                if (newWinner === oldWinner) {
+                    // No change — just close edit mode
+                    editingMatches.delete(matchId);
+                    renderMatches();
+                    return;
+                }
+
+                // Update this match
+                tournament.matches[matchIdx].winner = newWinner;
+                tournament.matches[matchIdx].result = 'completed';
+
+                // Roll back all rounds AFTER the current round
+                // (they were built from the old winner, so they're now invalid)
+                tournament.matches = tournament.matches.filter(m => m.round <= currentRound);
+
+                // Check if the whole current round is now done
+                const roundMatches = tournament.matches.filter(m => m.round === currentRound);
+                const allRoundDone = roundMatches.every(m => !!m.winner);
+
+                if (allRoundDone) {
+                    const winners = roundMatches.map(m => m.winner);
+                    if (winners.length > 1) {
+                        const nextRound = currentRound + 1;
+                        const nextMatches = buildKnockoutRound(winners, nextRound);
+                        tournament.matches = [...tournament.matches, ...nextMatches];
+                        showToast(`✓ Winner updated – Round ${nextRound} regenerated!`, 'success');
+                    } else {
+                        showToast(`🏆 ${winners[0]} is the new Champion!`, 'success');
+                    }
+                } else {
+                    showToast(`✓ Winner changed to ${newWinner}!`, 'success');
+                }
+
+                await updateDoc(doc(db, 'tournaments', tournamentId), {
+                    matches: tournament.matches
+                });
+
+                editingMatches.delete(matchId);
+                renderMatches(); renderStats(); renderLeaderboard();
+            } catch (err) {
+                showToast('⚠️ Error: ' + err.message, 'error');
+            }
+        };
+
+        // ================================================================
+        //  KNOCKOUT WINNER LOGIC + NEXT ROUND GENERATION
+        // ================================================================
+        window.setKnockoutWinner = async function (matchId, winner) {
+            if (!winner || !isAdmin) return;
+            try {
+                const matchIdx = tournament.matches.findIndex(m => m.id === matchId);
+                if (matchIdx === -1) return;
+
+                const currentRound = tournament.matches[matchIdx].round;
+                tournament.matches[matchIdx].winner = winner;
+                tournament.matches[matchIdx].result = 'completed';
+
+                const roundMatches = tournament.matches.filter(m => m.round === currentRound);
+                const allRoundDone = roundMatches.every(m => !!m.winner);
+
+                if (allRoundDone) {
+                    const winners = roundMatches.map(m => m.winner);
+                    if (winners.length > 1) {
+                        const nextRound = currentRound + 1;
+                        const nextMatches = buildKnockoutRound(winners, nextRound);
+                        tournament.matches = [...tournament.matches, ...nextMatches];
+                        showToast(`✓ Round ${nextRound} generated!`, 'success');
+                    } else {
+                        showToast(`🏆 ${winners[0]} is the Champion!`, 'success');
+                    }
+                } else {
+                    showToast(`✓ ${winner} advances!`, 'success');
+                }
+
+                await updateDoc(doc(db, 'tournaments', tournamentId), { matches: tournament.matches });
+                renderMatches(); renderStats(); renderLeaderboard();
+            } catch (err) {
+                showToast('⚠️ Error: ' + err.message, 'error');
+            }
+        };
+
+        function buildKnockoutRound(players, roundNum) {
+            const list = [...players];
+            const matches = [];
+            if (list.length % 2 !== 0) list.push('BYE');
+            for (let i = 0; i < list.length; i += 2) {
+                const isBye = list[i + 1] === 'BYE';
+                matches.push({
+                    id: `r${roundNum}_m${Math.floor(i / 2) + 1}`,
+                    round: roundNum,
+                    player1: list[i], player2: list[i + 1],
+                    winner: isBye ? list[i] : null,
+                    result: isBye ? 'bye' : null
+                });
+            }
+            return matches;
+        }
+
+        // ── Set League Result ────────────────────────────────────────
+        window.setLeagueResult = async function (matchId, result) {
+            if (!result || !isAdmin) return;
+            try {
+                const matchIdx = tournament.matches.findIndex(m => m.id === matchId);
+                if (matchIdx === -1) return;
+
+                tournament.matches[matchIdx].result = result;
+                const standings = recalculateStandings(tournament.players, tournament.matches);
+                tournament.standings = standings;
+
+                await updateDoc(doc(db, 'tournaments', tournamentId), {
+                    matches: tournament.matches, standings
+                });
+
+                showToast('✓ Result saved!', 'success');
+                renderMatches(); renderStats(); renderLeaderboard();
+            } catch (err) {
+                showToast('⚠️ Error: ' + err.message, 'error');
+            }
+        };
+
+        // ── Recalculate League Standings ─────────────────────────────
+        function recalculateStandings(players, matches) {
+            const stats = {};
+            players.forEach(p => { stats[p] = { name: p, played: 0, wins: 0, draws: 0, losses: 0, points: 0 }; });
+
+            matches.forEach(match => {
+                if (!match.result) return;
+                const p1 = match.player1, p2 = match.player2;
+                if (match.result === 'player1') {
+                    stats[p1].played++; stats[p1].wins++; stats[p1].points += 1;
+                    stats[p2].played++; stats[p2].losses++;
+                } else if (match.result === 'player2') {
+                    stats[p2].played++; stats[p2].wins++; stats[p2].points += 1;
+                    stats[p1].played++; stats[p1].losses++;
+                } else if (match.result === 'draw') {
+                    stats[p1].played++; stats[p1].draws++; stats[p1].points += 0.5;
+                    stats[p2].played++; stats[p2].draws++; stats[p2].points += 0.5;
+                }
+            });
+
+            return Object.values(stats).sort((a, b) =>
+                b.points !== a.points ? b.points - a.points : b.wins - a.wins
+            );
+        }
+
+        // ── Render Leaderboard ───────────────────────────────────────
+        function renderLeaderboard() {
+            const tbody = document.getElementById('leaderboardBody');
+            const emptyEl = document.getElementById('leaderboardEmpty');
+            const table = document.getElementById('leaderboardTable');
+            tbody.innerHTML = '';
+
+            let standings = [];
+            if (tournament.format === 'league') {
+                standings = tournament.standings?.length
+                    ? [...tournament.standings].sort((a, b) => b.points - a.points || b.wins - a.wins)
+                    : recalculateStandings(tournament.players, tournament.matches);
+            } else {
+                standings = buildKnockoutStandings(tournament.players, tournament.matches);
+            }
+
+            if (!standings.length) {
+                table.classList.add('hidden'); emptyEl.classList.remove('hidden'); return;
+            }
+            table.classList.remove('hidden'); emptyEl.classList.add('hidden');
+
+            standings.forEach((player, idx) => {
+                const rank = idx + 1;
+                const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+                const isWinner = tournament.status === 'finished' && tournament.winner === player.name;
+
+                const tr = document.createElement('tr');
+                if (isWinner) tr.style.background = 'rgba(212,175,55,0.08)';
+                tr.innerHTML = `
+                    <td><span class="rank-badge ${rankClass}">${rank}</span></td>
+                    <td style="font-weight:600">${player.name}${isWinner ? ' <span style="color:var(--gold);font-size:0.8rem;">♛</span>' : ''}</td>
+                    <td style="color:var(--text-secondary)">${player.played}</td>
+                    <td style="color:var(--success)">${player.wins}</td>
+                    <td style="color:var(--warning)">${player.draws ?? '–'}</td>
+                    <td style="color:var(--danger)">${player.losses ?? '–'}</td>
+                    <td class="points-cell">${player.points}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function buildKnockoutStandings(players, matches) {
+            const stats = {};
+            players.forEach(p => { stats[p] = { name: p, played: 0, wins: 0, draws: 0, losses: 0, points: 0 }; });
+            matches.forEach(match => {
+                if (!match.winner || match.result === 'bye') return;
+                if (match.player2 !== 'BYE') {
+                    stats[match.player1].played++;
+                    if (stats[match.player2]) { stats[match.player2].played++; stats[match.player2].losses++; }
+                }
+                if (stats[match.winner]) { stats[match.winner].wins++; stats[match.winner].points++; }
+            });
+            return Object.values(stats).sort((a, b) => b.points - a.points || b.wins - a.wins);
+        }
+
+        // ================================================================
+        //  FINISH TOURNAMENT MODAL
+        // ================================================================
+        window.openFinishModal = function () {
+            document.getElementById('finishAlert').innerHTML = '';
+            document.getElementById('finishModal').style.display = 'flex';
+        };
+
+        window.closeFinishModal = function (e) {
+            if (!e || e.target === document.getElementById('finishModal')) {
+                document.getElementById('finishModal').style.display = 'none';
+            }
+        };
+
+        window.confirmFinish = async function () {
+            const winner = document.getElementById('winnerSelect').value;
+            const alertEl = document.getElementById('finishAlert');
+            const btn = document.getElementById('confirmFinishBtn');
+
+            if (!winner) {
+                alertEl.innerHTML = '<div class="alert alert-error">⚠️ Please select a winner.</div>';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Saving…';
+
+            try {
+                await updateDoc(doc(db, 'tournaments', tournamentId), {
+                    status: 'finished',
+                    winner
+                });
+
+                tournament.status = 'finished';
+                tournament.winner = winner;
+
+                document.getElementById('finishModal').style.display = 'none';
+                showToast(`🏆 ${winner} declared as winner!`, 'success');
+
+                // Re-render everything to reflect finished state
+                renderTournament();
+            } catch (err) {
+                alertEl.innerHTML = `<div class="alert alert-error">⚠️ ${err.message}</div>`;
+                btn.disabled = false;
+                btn.textContent = '🏆 Confirm Winner';
+            }
+        };
+
+        // ================================================================
+        //  DELETE TOURNAMENT MODAL
+        // ================================================================
+        window.openDeleteModal = function () {
+            document.getElementById('deleteModal').style.display = 'flex';
+        };
+
+        window.closeDeleteModal = function (e) {
+            if (!e || e.target === document.getElementById('deleteModal')) {
+                document.getElementById('deleteModal').style.display = 'none';
+            }
+        };
+
+        window.confirmDelete = async function () {
+            const btn = document.getElementById('confirmDeleteBtn');
+            btn.disabled = true;
+            btn.textContent = 'Deleting…';
+            try {
+                await deleteDoc(doc(db, 'tournaments', tournamentId));
+                showToast('Tournament deleted.', 'info');
+                setTimeout(() => { window.location.href = 'index.html'; }, 800);
+            } catch (err) {
+                showToast('⚠️ Error: ' + err.message, 'error');
+                btn.disabled = false;
+                btn.textContent = 'Delete';
+            }
+        };
+
+        // ── Helpers ──────────────────────────────────────────────────
+        function variantLabel(v) {
+            const map = {
+                chess960: 'Chess960', crazyhouse: 'Crazyhouse',
+                kingofthehill: 'King of the Hill', threecheck: 'Three-Check',
+                antichess: 'Antichess', atomic: 'Atomic',
+                horde: 'Horde', racingkings: 'Racing Kings'
+            };
+            return map[v] || v;
+        }
+
+        function showError(msg) {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('errorState').classList.remove('hidden');
+            document.getElementById('errorMsg').textContent = msg;
+        }
+
+        window.showToast = function (msg, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = `show toast-${type}`;
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => toast.className = '', 3000);
+        };
+    </script>
+</body>
+
+</html>

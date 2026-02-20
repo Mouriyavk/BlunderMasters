@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scoreboard – Blunder Masters</title>
+    <meta name="description" content="All-time winners and tournament results for Blunder Masters." />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♛</text></svg>" />
+</head>
+
+<body>
+
+    <!-- ── Navigation ── -->
+    <nav>
+        <div class="nav-inner">
+            <a href="index.html" class="nav-brand">
+                <span class="chess-icon">♛</span>
+                <span>Blunder Masters</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="scoreboard.html" class="active">Scoreboard</a>
+                <span id="navAdminName" class="admin-indicator hidden">♟ Admin</span>
+                <a href="dashboard.html" id="navDashboard" class="hidden btn-nav-primary">Dashboard</a>
+                <button id="navLogout" class="hidden">Logout</button>
+                <button id="navLoginBtn" onclick="window.location.href='index.html?login=true'">Admin Login</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ── Header ── -->
+    <div class="container" style="padding-top:40px;">
+        <div class="section-header">
+            <div>
+                <div class="section-title">Hall of Fame</div>
+                <div class="section-subtitle">Wall of Champions and Tournament Winners</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Content ── -->
+    <div class="container">
+        <div class="card card-gold">
+            <div class="table-wrap">
+                <table id="scoreboardTable">
+                    <thead>
+                        <tr>
+                            <th>Tournament</th>
+                            <th>Date</th>
+                            <th>Format</th>
+                            <th>Winner</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scoreboardBody">
+                        <tr>
+                            <td colspan="4" style="text-align:center;padding:40px;">
+                                <div class="spinner"></div>
+                                <p style="margin-top:10px;color:var(--text-muted)">Loading championships…</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ── Stats Summary ── -->
+        <div class="stats-row mt-24" id="globalStats">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <!-- ── Toast ── -->
+    <div id="toast"></div>
+
+    <!-- ── Scripts ── -->
+    <script type="module">
+        import { auth, db } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { collection, getDocs, orderBy, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+        // ── Auth State ── 
+        onAuthStateChanged(auth, (user) => {
+            const navDashboard = document.getElementById('navDashboard');
+            const navLogout = document.getElementById('navLogout');
+            const navLoginBtn = document.getElementById('navLoginBtn');
+            const navAdminName = document.getElementById('navAdminName');
+
+            if (user) {
+                navDashboard.classList.remove('hidden');
+                navLogout.classList.remove('hidden');
+                navAdminName.classList.remove('hidden');
+                navLoginBtn.classList.add('hidden');
+                navAdminName.textContent = '♟ ' + (user.email.split('@')[0]);
+            } else {
+                navDashboard.classList.add('hidden');
+                navLogout.classList.add('hidden');
+                navAdminName.classList.add('hidden');
+                navLoginBtn.classList.remove('hidden');
+            }
+        });
+
+        document.getElementById('navLogout').addEventListener('click', async () => {
+            await signOut(auth);
+            window.location.href = 'index.html';
+        });
+
+        // ── Load Scoreboard ──
+        async function loadScoreboard() {
+            const tbody = document.getElementById('scoreboardBody');
+            const statsRow = document.getElementById('globalStats');
+
+            try {
+                // Get all tournaments that have a winner
+                const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
+                const snap = await getDocs(q);
+
+                if (snap.empty) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:30px;">No tournaments found.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                let totalTournaments = 0;
+                let totalWinners = 0;
+                let activeTournaments = 0;
+
+                snap.forEach(doc => {
+                    const t = doc.data();
+                    totalTournaments++;
+                    if (t.winner) totalWinners++;
+                    if (t.status === 'active') activeTournaments++;
+
+                    const date = t.createdAt?.toDate
+                        ? t.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                        : 'Unknown Date';
+
+                    const row = document.createElement('tr');
+
+                    // Winner Cell Style
+                    let winnerHtml = `<span style="color:var(--text-muted)">—</span>`;
+                    if (t.winner) {
+                        winnerHtml = `
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:1.2rem;">🏆</span>
+                                <span style="font-weight:700;color:var(--gold);font-size:1.05rem;">${t.winner}</span>
+                            </div>`;
+                    } else {
+                        winnerHtml = `<span class="result-badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted);border:1px solid var(--border)">In Progress</span>`;
+                    }
+
+                    row.innerHTML = `
+                        <td>
+                            <a href="tournament.html?id=${doc.id}" style="text-decoration:none;color:var(--text-primary);font-weight:600;display:block;">
+                                ${t.name}
+                            </a>
+                        </td>
+                        <td style="color:var(--text-secondary);font-size:0.85rem;">${date}</td>
+                        <td>
+                            <span class="format-badge ${t.format}" style="font-size:0.7rem;">
+                                ${t.format === 'knockout' ? '⚔️ KO' : '🏆 League'}
+                            </span>
+                        </td>
+                        <td>${winnerHtml}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+                // Update Stats
+                statsRow.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-value">${totalTournaments}</div>
+                        <div class="stat-label">Total Tournaments</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${totalWinners}</div>
+                        <div class="stat-label">Champions Crowned</div>
+                    </div>
+                     <div class="stat-card">
+                        <div class="stat-value">${activeTournaments}</div>
+                        <div class="stat-label">In Progress</div>
+                    </div>
+                `;
+
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--danger);padding:20px;">Error loading data: ${err.message}</td></tr>`;
+            }
+        }
+
+        loadScoreboard();
+    </script>
+</body>
+
+</html>
