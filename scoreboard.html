@@ -79,7 +79,7 @@
     <script type="module">
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-        import { collection, getDocs, orderBy, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { collection, onSnapshot, orderBy, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         // ── Auth State ── 
         onAuthStateChanged(auth, (user) => {
@@ -107,16 +107,14 @@
             window.location.href = 'index.html';
         });
 
-        // ── Load Scoreboard ──
-        async function loadScoreboard() {
+        // ── Load Scoreboard (Real-time) ─────────────────────────────
+        function loadScoreboard() {
             const tbody = document.getElementById('scoreboardBody');
             const statsRow = document.getElementById('globalStats');
 
-            try {
-                // Get all tournaments that have a winner
-                const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
-                const snap = await getDocs(q);
+            const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
 
+            onSnapshot(q, (snap) => {
                 if (snap.empty) {
                     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:30px;">No tournaments found.</td></tr>`;
                     return;
@@ -139,7 +137,6 @@
 
                     const row = document.createElement('tr');
 
-                    // Winner Cell Style
                     let winnerHtml = `<span style="color:var(--text-muted)">—</span>`;
                     if (t.winner) {
                         winnerHtml = `
@@ -183,10 +180,9 @@
                         <div class="stat-label">In Progress</div>
                     </div>
                 `;
-
-            } catch (err) {
+            }, (err) => {
                 tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--danger);padding:20px;">Error loading data: ${err.message}</td></tr>`;
-            }
+            });
         }
 
         loadScoreboard();
