@@ -111,7 +111,7 @@
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import {
             collection,
-            getDocs,
+            onSnapshot,
             orderBy,
             query
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -142,19 +142,19 @@
             }
         });
 
-        // ── Load Tournaments ────────────────────────────────────────
-        async function loadTournaments() {
+        // ── Load Tournaments (Real-time) ────────────────────────────
+        function loadTournaments() {
             const listEl = document.getElementById('tournamentsList');
-            try {
-                const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
-                const snap = await getDocs(q);
+            const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
 
+            // onSnapshot provides real-time updates
+            onSnapshot(q, (snap) => {
                 if (snap.empty) {
                     listEl.innerHTML = `
-          <div class="empty-state" style="grid-column:1/-1">
-            <div class="empty-icon">♟</div>
-            <p>No tournaments yet. Create the first one!</p>
-          </div>`;
+                        <div class="empty-state" style="grid-column:1/-1">
+                          <div class="empty-icon">♟</div>
+                          <p>No tournaments yet. Create the first one!</p>
+                        </div>`;
                     return;
                 }
 
@@ -165,7 +165,6 @@
                         ? t.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
                         : 'Recently';
 
-                    // Count completed matches
                     const total = t.matches?.length || 0;
                     const completed = t.matches?.filter(m => m.result || m.winner).length || 0;
 
@@ -173,26 +172,26 @@
                     card.href = `tournament.html?id=${doc.id}`;
                     card.className = 'tournament-card';
                     card.innerHTML = `
-          <div class="flex-between mb-8">
-            <span class="format-badge ${t.format}">${t.format === 'knockout' ? '⚔️ Knockout' : '🏆 League'}</span>
-            <span style="font-size:0.75rem;color:var(--text-muted)">${date}</span>
-          </div>
-          <div class="tournament-card-name">${t.name}</div>
-          <div style="font-size:0.85rem;color:var(--text-secondary);margin-top:6px">
-            ${t.players?.length || 0} players
-          </div>
-          <div class="tournament-card-meta">
-            <span style="color:${completed === total && total > 0 ? 'var(--success)' : 'var(--gold)'}">
-              ${completed === total && total > 0 ? '✓ Completed' : `${completed}/${total} matches played`}
-            </span>
-          </div>`;
+                        <div class="flex-between mb-8">
+                          <span class="format-badge ${t.format}">${t.format === 'knockout' ? '⚔️ Knockout' : '🏆 League'}</span>
+                          <span style="font-size:0.75rem;color:var(--text-muted)">${date}</span>
+                        </div>
+                        <div class="tournament-card-name">${t.name}</div>
+                        <div style="font-size:0.85rem;color:var(--text-secondary);margin-top:6px">
+                          ${t.players?.length || 0} players
+                        </div>
+                        <div class="tournament-card-meta">
+                          <span style="color:${completed === total && total > 0 ? 'var(--success)' : 'var(--gold)'}">
+                            ${completed === total && total > 0 ? '✓ Completed' : `${completed}/${total} matches played`}
+                          </span>
+                        </div>`;
                     listEl.appendChild(card);
                 });
-            } catch (err) {
+            }, (err) => {
                 listEl.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-        <p>⚠️ Error loading tournaments: ${err.message}</p>
-      </div>`;
-            }
+                    <p>⚠️ Error loading tournaments: ${err.message}</p>
+                </div>`;
+            });
         }
 
         loadTournaments();
