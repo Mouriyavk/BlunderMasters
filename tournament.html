@@ -438,18 +438,24 @@
                     const p1Class = match.winner === match.player1 ? 'player-name winner' : 'player-name';
                     const p2Class = match.winner === match.player2 ? 'player-name winner' : 'player-name';
 
+                    let watchBtn = '';
+                    if (match.watchLink) {
+                        watchBtn = `<a href="${match.watchLink}" target="_blank" class="btn-watch" title="Watch on Chess.com">👁 Watch</a>`;
+                    }
+
                     let resultHtml = '';
                     if (isBye) {
                         resultHtml = `<span class="result-badge bye">BYE – auto advance</span>`;
                     } else if (isEditing) {
-                        // Inline edit mode: show dropdown pre-selected + cancel
+                        // Inline edit mode: show dropdown pre-selected + link + cancel
                         resultHtml = `
-                            <div style="display:flex;align-items:center;gap:8px;">
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                                 <select id="ko_edit_${match.id}" style="font-size:0.85rem;">
                                     <option value="">Select winner…</option>
                                     <option value="${match.player1}" ${match.winner === match.player1 ? 'selected' : ''}>${match.player1}</option>
                                     <option value="${match.player2}" ${match.winner === match.player2 ? 'selected' : ''}>${match.player2}</option>
                                 </select>
+                                <input type="url" id="ko_link_${match.id}" class="match-link-input" placeholder="Chess.com link…" value="${match.watchLink || ''}">
                                 <button class="btn btn-success btn-sm" onclick="editKnockoutWinner('${match.id}')" style="padding:6px 12px;">Save</button>
                                 <button class="btn btn-secondary btn-sm" onclick="cancelEdit('${match.id}')" style="padding:6px 10px;">✕</button>
                             </div>`;
@@ -457,17 +463,27 @@
                         resultHtml = `
                             <div style="display:flex;align-items:center;gap:8px;">
                                 <span class="result-badge win">✓ ${match.winner} wins</span>
+                                ${watchBtn}
                                 ${canEditBtn ? `<button class="btn-edit" onclick="toggleEditMatch('${match.id}')" title="Edit result">✏️ Edit</button>` : ''}
                             </div>`;
                     } else if (canEnter) {
                         resultHtml = `
-                            <select id="ko_${match.id}" onchange="setKnockoutWinner('${match.id}', this.value)">
-                                <option value="">Select winner…</option>
-                                <option value="${match.player1}">${match.player1}</option>
-                                <option value="${match.player2}">${match.player2}</option>
-                            </select>`;
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                <select id="ko_${match.id}" style="font-size:0.85rem;">
+                                    <option value="">Select winner…</option>
+                                    <option value="${match.player1}">${match.player1}</option>
+                                    <option value="${match.player2}">${match.player2}</option>
+                                </select>
+                                <input type="url" id="ko_link_${match.id}" class="match-link-input" placeholder="Chess.com link…" value="${match.watchLink || ''}">
+                                <button class="btn btn-success btn-sm" onclick="saveKnockoutResult('${match.id}')">Save</button>
+                                ${watchBtn}
+                            </div>`;
                     } else {
-                        resultHtml = `<span style="font-size:0.8rem;color:var(--text-muted)">${roundNum < activeRound ? 'Done' : 'Pending'}</span>`;
+                        resultHtml = `
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:0.8rem;color:var(--text-muted)">${roundNum < activeRound ? 'Done' : 'Pending'}</span>
+                                ${watchBtn}
+                            </div>`;
                     }
 
                     card.innerHTML = `
@@ -546,17 +562,23 @@
                     const card = document.createElement('div');
                     card.className = `match-card ${isComplete && !isEditing ? 'completed' : ''}`;
 
+                    let watchBtn = '';
+                    if (match.watchLink) {
+                        watchBtn = `<a href="${match.watchLink}" target="_blank" class="btn-watch" title="Watch on Chess.com">👁 Watch</a>`;
+                    }
+
                     let resultHtml = '';
                     if (isEditing) {
-                        // Inline edit: show dropdown pre-selected to current result + save/cancel
+                        // Inline edit: show dropdown pre-selected to current result + link + save/cancel
                         resultHtml = `
-                            <div style="display:flex;align-items:center;gap:8px;">
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                                 <select id="lg_edit_${match.id}" style="font-size:0.85rem;">
                                     <option value="">Result…</option>
                                     <option value="player1" ${match.result === 'player1' ? 'selected' : ''}>${match.player1} wins</option>
                                     <option value="draw" ${match.result === 'draw' ? 'selected' : ''}>Draw</option>
                                     <option value="player2" ${match.result === 'player2' ? 'selected' : ''}>${match.player2} wins</option>
                                 </select>
+                                <input type="url" id="lg_link_${match.id}" class="match-link-input" placeholder="Chess.com link…" value="${match.watchLink || ''}">
                                 <button class="btn btn-success btn-sm" onclick="editLeagueResult('${match.id}')" style="padding:6px 12px;">Save</button>
                                 <button class="btn btn-secondary btn-sm" onclick="cancelEdit('${match.id}')" style="padding:6px 10px;">✕</button>
                             </div>`;
@@ -568,18 +590,28 @@
                         resultHtml = `
                             <div style="display:flex;align-items:center;gap:8px;">
                                 ${badge}
+                                ${watchBtn}
                                 ${canEditBtn ? `<button class="btn-edit" onclick="toggleEditMatch('${match.id}')" title="Edit result">✏️ Edit</button>` : ''}
                             </div>`;
                     } else if (canEnter) {
                         resultHtml = `
-                            <select id="lg_${match.id}" onchange="setLeagueResult('${match.id}', this.value)">
-                                <option value="">Result…</option>
-                                <option value="player1">${match.player1} wins</option>
-                                <option value="draw">Draw</option>
-                                <option value="player2">${match.player2} wins</option>
-                            </select>`;
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                <select id="lg_${match.id}" style="font-size:0.85rem;">
+                                    <option value="">Result…</option>
+                                    <option value="player1">${match.player1} wins</option>
+                                    <option value="draw">Draw</option>
+                                    <option value="player2">${match.player2} wins</option>
+                                </select>
+                                <input type="url" id="lg_link_${match.id}" class="match-link-input" placeholder="Chess.com link…" value="${match.watchLink || ''}">
+                                <button class="btn btn-success btn-sm" onclick="saveLeagueResult('${match.id}')">Save</button>
+                                ${watchBtn}
+                            </div>`;
                     } else {
-                        resultHtml = `<span style="font-size:0.8rem;color:var(--text-muted)">Pending</span>`;
+                        resultHtml = `
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:0.8rem;color:var(--text-muted)">Pending</span>
+                                ${watchBtn}
+                            </div>`;
                     }
 
                     const p1Style = match.result === 'player1' && !isEditing ? 'color:var(--gold);font-weight:700;' : '';
@@ -621,6 +653,7 @@
         // ── Edit a LEAGUE result (replace existing result) ───────────
         window.editLeagueResult = async function (matchId) {
             const newResult = document.getElementById(`lg_edit_${matchId}`)?.value;
+            const watchLink = document.getElementById(`lg_link_${matchId}`)?.value.trim();
             if (!newResult || !isAdmin) return;
 
             try {
@@ -628,6 +661,7 @@
                 if (matchIdx === -1) return;
 
                 tournament.matches[matchIdx].result = newResult;
+                tournament.matches[matchIdx].watchLink = watchLink;
                 const standings = recalculateStandings(tournament.players, tournament.matches);
                 tournament.standings = standings;
 
@@ -636,7 +670,7 @@
                 });
 
                 editingMatches.delete(matchId);
-                showToast('✓ Result updated!', 'success');
+                showToast('✓ Result & link updated!', 'success');
                 renderMatches(); renderStats(); renderLeaderboard();
             } catch (err) {
                 showToast('⚠️ Error: ' + err.message, 'error');
@@ -646,6 +680,7 @@
         // ── Edit a KNOCKOUT winner (rolls back subsequent rounds) ────
         window.editKnockoutWinner = async function (matchId) {
             const newWinner = document.getElementById(`ko_edit_${matchId}`)?.value;
+            const watchLink = document.getElementById(`ko_link_${matchId}`)?.value.trim();
             if (!newWinner || !isAdmin) return;
 
             try {
@@ -655,14 +690,21 @@
                 const currentRound = tournament.matches[matchIdx].round;
                 const oldWinner = tournament.matches[matchIdx].winner;
 
+                // Update watchLink regardless of winner change
+                tournament.matches[matchIdx].watchLink = watchLink;
+
                 if (newWinner === oldWinner) {
-                    // No change — just close edit mode
+                    // No winner change — just save potential link change
+                    await updateDoc(doc(db, 'tournaments', tournamentId), {
+                        matches: tournament.matches
+                    });
                     editingMatches.delete(matchId);
+                    showToast('✓ Match updated!', 'success');
                     renderMatches();
                     return;
                 }
 
-                // Update this match
+                // Update this match winner
                 tournament.matches[matchIdx].winner = newWinner;
                 tournament.matches[matchIdx].result = 'completed';
 
@@ -702,34 +744,41 @@
         // ================================================================
         //  KNOCKOUT WINNER LOGIC + NEXT ROUND GENERATION
         // ================================================================
-        window.setKnockoutWinner = async function (matchId, winner) {
-            if (!winner || !isAdmin) return;
+        // ── Set Knockout Winner (initial entry) ──────────────────────
+        window.saveKnockoutResult = async function (matchId) {
+            const winner = document.getElementById(`ko_${matchId}`)?.value;
+            const watchLink = document.getElementById(`ko_link_${matchId}`)?.value.trim();
+            if (!isAdmin) return;
+            if (!winner && !watchLink) {
+                showToast('⚠️ Please select a winner or add a link.', 'warning');
+                return;
+            }
             try {
                 const matchIdx = tournament.matches.findIndex(m => m.id === matchId);
                 if (matchIdx === -1) return;
 
-                const currentRound = tournament.matches[matchIdx].round;
-                tournament.matches[matchIdx].winner = winner;
-                tournament.matches[matchIdx].result = 'completed';
+                tournament.matches[matchIdx].watchLink = watchLink;
 
-                const roundMatches = tournament.matches.filter(m => m.round === currentRound);
-                const allRoundDone = roundMatches.every(m => !!m.winner);
+                if (winner) {
+                    const currentRound = tournament.matches[matchIdx].round;
+                    tournament.matches[matchIdx].winner = winner;
+                    tournament.matches[matchIdx].result = 'completed';
 
-                if (allRoundDone) {
-                    const winners = roundMatches.map(m => m.winner);
-                    if (winners.length > 1) {
-                        const nextRound = currentRound + 1;
-                        const nextMatches = buildKnockoutRound(winners, nextRound);
-                        tournament.matches = [...tournament.matches, ...nextMatches];
-                        showToast(`✓ Round ${nextRound} generated!`, 'success');
-                    } else {
-                        showToast(`🏆 ${winners[0]} is the Champion!`, 'success');
+                    const roundMatches = tournament.matches.filter(m => m.round === currentRound);
+                    const allRoundDone = roundMatches.every(m => !!m.winner);
+
+                    if (allRoundDone) {
+                        const winners = roundMatches.map(m => m.winner);
+                        if (winners.length > 1) {
+                            const nextRound = currentRound + 1;
+                            const nextMatches = buildKnockoutRound(winners, nextRound);
+                            tournament.matches = [...tournament.matches, ...nextMatches];
+                        }
                     }
-                } else {
-                    showToast(`✓ ${winner} advances!`, 'success');
                 }
 
                 await updateDoc(doc(db, 'tournaments', tournamentId), { matches: tournament.matches });
+                showToast(winner ? '✓ Match result saved!' : '✓ Watch link saved!', 'success');
                 renderMatches(); renderStats(); renderLeaderboard();
             } catch (err) {
                 showToast('⚠️ Error: ' + err.message, 'error');
@@ -754,13 +803,23 @@
         }
 
         // ── Set League Result ────────────────────────────────────────
-        window.setLeagueResult = async function (matchId, result) {
-            if (!result || !isAdmin) return;
+        // ── Set League Result (initial entry) ────────────────────────
+        window.saveLeagueResult = async function (matchId) {
+            const result = document.getElementById(`lg_${matchId}`)?.value;
+            const watchLink = document.getElementById(`lg_link_${matchId}`)?.value.trim();
+            if (!isAdmin) return;
+            if (!result && !watchLink) {
+                showToast('⚠️ Please select a result or add a link.', 'warning');
+                return;
+            }
             try {
                 const matchIdx = tournament.matches.findIndex(m => m.id === matchId);
                 if (matchIdx === -1) return;
 
-                tournament.matches[matchIdx].result = result;
+                tournament.matches[matchIdx].watchLink = watchLink;
+                if (result) {
+                    tournament.matches[matchIdx].result = result;
+                }
                 const standings = recalculateStandings(tournament.players, tournament.matches);
                 tournament.standings = standings;
 
@@ -768,7 +827,7 @@
                     matches: tournament.matches, standings
                 });
 
-                showToast('✓ Result saved!', 'success');
+                showToast(result ? '✓ Result saved!' : '✓ Watch link saved!', 'success');
                 renderMatches(); renderStats(); renderLeaderboard();
             } catch (err) {
                 showToast('⚠️ Error: ' + err.message, 'error');
