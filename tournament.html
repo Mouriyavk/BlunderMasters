@@ -204,7 +204,7 @@
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import {
-            doc, getDoc, updateDoc, deleteDoc
+            doc, onSnapshot, updateDoc, deleteDoc
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         // ── State ────────────────────────────────────────────────────
@@ -250,17 +250,20 @@
             showToast('Logged out.', 'info');
         });
 
-        // ── Load Tournament ──────────────────────────────────────────
-        async function loadTournament() {
+        // ── Load Tournament (Real-time) ─────────────────────────────
+        function loadTournament() {
             if (!tournamentId) return;
-            try {
-                const docSnap = await getDoc(doc(db, 'tournaments', tournamentId));
-                if (!docSnap.exists()) { showError('Tournament not found.'); return; }
+            // Listen for changes to this specific tournament document
+            onSnapshot(doc(db, 'tournaments', tournamentId), (docSnap) => {
+                if (!docSnap.exists()) {
+                    showError('Tournament not found.');
+                    return;
+                }
                 tournament = docSnap.data();
                 renderTournament();
-            } catch (err) {
+            }, (err) => {
                 showError('Error loading tournament: ' + err.message);
-            }
+            });
         }
 
         loadTournament();
