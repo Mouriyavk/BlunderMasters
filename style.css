@@ -752,6 +752,60 @@ tbody td {
     margin-top: 0;
 }
 
+/* ── Watch Button ── */
+.btn-watch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--info);
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    padding: 4px 10px;
+    border-radius: 100px;
+    text-decoration: none;
+    transition: all var(--transition);
+}
+
+.btn-watch:hover {
+    background: rgba(59, 130, 246, 0.2);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.match-link-input {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    padding: 6px 10px;
+    width: 140px;
+    outline: none;
+    transition: all var(--transition);
+}
+
+.match-link-input:focus {
+    border-color: var(--info);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.btn-edit {
+    background: none;
+    border: none;
+    color: var(--gold);
+    font-size: 0.75rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.btn-edit:hover {
+    background: rgba(212, 175, 55, 0.1);
+}
+
 /* ── Auth / Login ── */
 .auth-section {
     max-width: 440px;
