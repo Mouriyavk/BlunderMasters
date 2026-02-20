@@ -202,7 +202,7 @@
         import { auth, db } from './firebase-config.js';
         import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import {
-            collection, addDoc, getDocs, deleteDoc,
+            collection, addDoc, onSnapshot, deleteDoc,
             doc, orderBy, query, serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -402,15 +402,12 @@
             return players.map(name => ({ name, played: 0, wins: 0, draws: 0, losses: 0, points: 0 }));
         }
 
-        // ── Load Tournaments List ────────────────────────────────────
-        window.loadMyTournaments = async function () {
+        // ── Load Tournaments List (Real-time) ────────────────────────
+        function loadMyTournaments() {
             const listEl = document.getElementById('myTournamentsList');
-            listEl.innerHTML = '<div class="loading-wrap"><div class="spinner"></div><p>Loading…</p></div>';
+            const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
 
-            try {
-                const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
-                const snap = await getDocs(q);
-
+            onSnapshot(q, (snap) => {
                 if (snap.empty) {
                     listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">♟</div><p>No tournaments yet.<br/>Create your first one!</p></div>`;
                     return;
@@ -428,7 +425,6 @@
                     const total = t.matches?.length || 0;
                     const isFinished = t.status === 'finished';
 
-                    // Build info chips
                     const chips = [];
                     if (t.timeControl) chips.push(`⏱ ${t.timeControl}`);
                     if (t.variant && t.variant !== 'standard') chips.push(`🎲 ${variantLabel(t.variant)}`);
@@ -458,9 +454,9 @@
                         </div>`;
                     listEl.appendChild(item);
                 });
-            } catch (err) {
+            }, (err) => {
                 listEl.innerHTML = `<div class="alert alert-error">⚠️ ${err.message}</div>`;
-            }
+            });
         };
 
         // ── Delete Modal ─────────────────────────────────────────────
